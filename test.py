@@ -71,22 +71,20 @@ class MyLangGraphAgent:
 
     def _format_prompt(self, job: str, search_results: str) -> List[Dict[str, str]]:
         system_prompt = dedent(f"""
-        You are an expert AI research analyst specializing in industry applications of AI.
-        Analyze the following information about AI in {job} and extract specific examples.
-
-        ### Required Output Format ###
-        You MUST respond with ONLY this Markdown table structure:
-
+        You MUST format your response as a perfect Markdown table with EXACTLY this structure:
+    
         ```markdown
         | Task/Function | AI Technology | Implementation Details | Impact | Source |
         |---------------|---------------|------------------------|--------|--------|
-        [5-8 specific examples]
+        | [Task] | [Technology] | [Details] | [Impact] | [Source] |
+        | ... | ... | ... | ... | ... |
         ```
-
-        Focus on:
-        - Concrete implementations (specific tools/technologies)
-        - Measurable impact (include numbers when possible)
-        - Verified information (must match the sources provided)
+    
+        RULES:
+        1. Maintain EXACTLY 5 columns
+        2. Use ONLY pipe syntax (|) for tables
+        3. Source column must show as [Domain](URL)
+        4. No additional text before or after table
         """)
         return [
             {"role": "system", "content": system_prompt},
@@ -237,26 +235,29 @@ def main():
                 
                 if "error" in result:
                     st.error(result["error"])
-                    if "suggestion" in result:
-                        st.info(result["suggestion"])
                 else:
                     markdown_output = result["messages"][-1].content
-                    st.subheader(f"AI Applications in {job}")
-                    st.markdown(markdown_output)
                     
-                    if DOCX_AVAILABLE:
-                        try:
-                            docx_file, filename = convert_to_docx(markdown_output)
-                            st.download_button(
-                                label="📄 Download Report",
-                                data=docx_file,
-                                file_name=filename,
-                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                            )
-                        except Exception as e:
-                            st.warning(f"DOCX export failed: {str(e)}")
+                    # Clean and verify the table format
+                    if "|" in markdown_output:
+                        # Display with proper Markdown rendering
+                        st.markdown("### AI Applications Table")
+                        st.markdown(markdown_output, unsafe_allow_html=True)
+                        
+                        # Optional: Display as HTML table for better rendering
+                        st.write("")  # Spacer
+                        st.markdown("<h4>Formatted Table View</h4>", unsafe_allow_html=True)
+                        st.markdown(
+                            f"""
+                            <div style='margin: 10px 0; overflow-x: auto;'>
+                            {markdown_output}
+                            </div>
+                            """, 
+                            unsafe_allow_html=True
+                        )
                     else:
-                        st.warning("DOCX export unavailable - showing Markdown only")
+                        st.warning("Unexpected output format")
+                        st.code(markdown_output)  # Show raw output for debugging
                         
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}")
